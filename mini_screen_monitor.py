@@ -94,7 +94,7 @@ class Screen:
             return False
         try:
             self.ser = serial.Serial(port, BAUD, bytesize=8, parity="N",
-                                     stopbits=1, timeout=0.2)
+                                     stopbits=1, timeout=0.2, exclusive=True)
             self.port_name = port
             return True
         except Exception as e:
@@ -523,18 +523,21 @@ def make_test_image():
     return img
 
 
+_LOCK_FP = None
+
 def acquire_lock():
-    """防止多个实例同时写串口"""
+    """防止多个实例同时写串口。文件对象必须全程持有, 否则锁立即失效。"""
+    global _LOCK_FP
     lock_path = "/tmp/mini-screen-monitor.lock"
     fp = open(lock_path, "w")
     try:
         fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        print("已有实例在运行 (先停止它: pkill -f mini_screen_monitor,"
-              " 或 systemctl --user stop mini-screen-monitor)",
+        print("已有实例在运行 (先停止它: pgrep -f mini_screen_monitor 查 PID"
+              " 后 kill, 或 systemctl --user stop ncp-controlpanel)",
               file=sys.stderr)
         sys.exit(1)
-    return fp
+    _LOCK_FP = fp
 
 
 def main():
@@ -560,7 +563,6 @@ def main():
 
     if not args.dump:
         acquire_lock()
-
     if args.test_pattern:
         scr = Screen()
         if not scr.connect(args.port):
