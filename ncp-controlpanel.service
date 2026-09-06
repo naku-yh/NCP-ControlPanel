@@ -1,0 +1,11 @@
+[Unit]
+Description=USB mini screen system monitor (CH554 480x320)
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u %h/.zcode/workspace/default/NCP-ControlPanel/mini_screen_monitor.py --no-preview --interval 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

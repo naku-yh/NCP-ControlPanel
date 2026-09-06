@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+fonts/simhei_.ttf
+local_config.py
