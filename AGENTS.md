@@ -46,7 +46,7 @@ README.md                 使用文档
 - Python 3.10，依赖 `pyserial psutil numpy pillow nvidia-ml-py`（本机已
   `pip install --user` 装好）。
 - 串口权限靠 udev 规则 `/etc/udev/rules.d/99-ch554-mini-screen.rules`
-  （uaccess + dialout 组），**不要用 sudo 运行程序**。
+  （MODE 0666，插拔后立即可用），**不要用 sudo 运行程序**。
 - 程序有单实例文件锁（`/tmp/mini-screen-monitor.lock`）；测试前先停旧实例：
   先 `pgrep -f mini_screen_monitor` 拿 PID 再 `kill <PID>`。
   **注意：`pkill -f mini_screen_monitor` 会匹配到执行它的 shell 自身并误杀。**

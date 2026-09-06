@@ -39,7 +39,7 @@ python3 mini_screen_monitor.py --no-preview
 ```
 
 首次运行需串口权限：已安装 `/etc/udev/rules.d/99-ch554-mini-screen.rules`
-（MODE 0660 + GROUP dialout + uaccess），并把用户加入 dialout 组。
+（MODE 0666，插拔后自动生效）。
 
 ## 开机自启（systemd 用户服务）
 
