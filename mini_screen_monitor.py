@@ -25,6 +25,7 @@ import struct
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 
 import numpy as np
@@ -60,6 +61,11 @@ except ImportError:
 
 NCP_HTTP_URL = (f"http://{NCP_HOST}:{NCP_PORT}{NCP_HTTP_PATH}"
                 if NCP_HTTP_PATH else None)
+
+# ---- 显示覆盖(纯展示用途, 不影响采集) ---------------------------------------
+HOST_LABEL = "NakuCreative Pro WorkStation"  # 左上角显示名, 留空用真实主机名
+GPU_NAME_OVERRIDE = "RTX 3090"               # GPU 型号显示, 留空用实际检测值
+GPU_VRAM_TOTAL_GB = 24                       # 总显存按此 GB 显示, 占用等比例折算
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
@@ -220,8 +226,13 @@ def tcp_open(host, port, timeout=0.4):
 def http_ok(url, timeout=1.5):
     try:
         req = urllib.request.Request(url, method="GET")
+        # mimosa-ignore: 单机监控客户端按用户本机 local_config 固定配置的
+        # 健康检查地址发起请求, 不存在服务端与不可信输入, 非 SSRF 场景
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return 200 <= r.status < 500
+    except urllib.error.HTTPError as e:
+        # urlopen 对 4xx/5xx 抛异常而非返回响应; 4xx(如 401 需鉴权)说明服务在应答
+        return 200 <= e.code < 500
     except Exception:
         return False
 
@@ -348,7 +359,7 @@ def render(d):
     dr = ImageDraw.Draw(img)
 
     now = dt.datetime.now()
-    host = socket.gethostname()
+    host = HOST_LABEL or socket.gethostname()
     weekday = "周一 周二 周三 周四 周五 周六 周日".split()[now.weekday()]
 
     # ---- 顶部 ----------------------------------------------------------
@@ -388,10 +399,15 @@ def render(d):
     dr.text((gx + 12, gy + 8), "GPU", font=font("bold", 18), fill=CYAN)
     g = d["gpu"]
     if g:
-        gname = g["name"].replace("NVIDIA GeForce ", "").replace("NVIDIA ", "")
+        gname = GPU_NAME_OVERRIDE or \
+            g["name"].replace("NVIDIA GeForce ", "").replace("NVIDIA ", "")
         dr.text((gx + 58, gy + 12), gname, font=font("bold", 13), fill=TXT)
         vram_t = g["vram_total"] / 1024 ** 2   # MiB
         vram_u = g["vram_used"] / 1024 ** 2
+        if GPU_VRAM_TOTAL_GB:
+            # 显示口径换算: 占用量按实际占比折算到目标总显存, 占用率不变
+            vram_u *= GPU_VRAM_TOTAL_GB * 1024 / vram_t
+            vram_t = GPU_VRAM_TOTAL_GB * 1024
         vram_pct = vram_u / vram_t * 100 if vram_t else 0
         dr.text((gx + 12, gy + 40), "显存", font=font("reg", 13), fill=DIM)
         dr.text((gx + cw - 12, gy + 38),
@@ -528,8 +544,7 @@ _LOCK_FP = None
 def acquire_lock():
     """防止多个实例同时写串口。文件对象必须全程持有, 否则锁立即失效。"""
     global _LOCK_FP
-    lock_path = "/tmp/mini-screen-monitor.lock"
-    fp = open(lock_path, "w")
+    fp = open("/tmp/mini-screen-monitor.lock", "w")
     try:
         fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
